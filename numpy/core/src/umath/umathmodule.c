@@ -82,6 +82,47 @@ object_ufunc_loop_selector(PyUFuncObject *ufunc,
     return 0;
 }
 
+
+static PyObject *
+ufunc_fromfunc(PyObject *NPY_UNUSED(dummy), PyObject *args, PyObject *NPY_UNUSED(kwds)) {
+
+    unsigned long func_address;
+    int nin, nout;
+    PyObject *type_list;
+    PyObject *type_obj;
+    int i;
+
+    if (!PyArg_ParseTuple(args, "kiiO!", &func_address, &nin, &nout, &PyList_Type, &type_list)) {
+        return NULL;
+    }
+
+    int num_types = PyList_Size(type_list);
+    if (num_types != nin+nout) {
+        /* throw exception? */
+    }
+
+    /* Add support for list of function pointers */
+    static PyUFuncGenericFunction func[1];
+    func[0] = (PyUFuncGenericFunction)func_address;
+
+    /*static char types = calloc(num_types, sizeof(char));
+    for (i = 0; i < num_types; i++) {
+        type_obj = PyList_GetItem(type_list, i);
+    }*/
+
+    /* figure out how to get types from type list argument, instead of being hard coded here */
+    static char types[3];
+    types[0] = NPY_FLOAT;
+    types[1] = NPY_FLOAT;
+    types[2] = NPY_FLOAT;
+
+    static void* data[1] = {0};
+
+    PyObject* ufunc = PyUFunc_FromFuncAndData((PyUFuncGenericFunction*)func,data,(char*)types,1,nin,nout,PyUFunc_None,"test",(char*)"test",0);
+
+    return ufunc;
+}
+
 static PyObject *
 ufunc_frompyfunc(PyObject *NPY_UNUSED(dummy), PyObject *args, PyObject *NPY_UNUSED(kwds)) {
     /* Keywords are ignored for now */
@@ -294,6 +335,9 @@ InitOtherOperators(PyObject *dictionary) {
 static struct PyMethodDef methods[] = {
     {"frompyfunc",
         (PyCFunction) ufunc_frompyfunc,
+        METH_VARARGS | METH_KEYWORDS, NULL},
+    {"fromfunc",
+        (PyCFunction) ufunc_fromfunc,
         METH_VARARGS | METH_KEYWORDS, NULL},
     {"seterrobj",
         (PyCFunction) ufunc_seterr,
