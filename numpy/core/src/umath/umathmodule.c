@@ -103,12 +103,20 @@ ufunc_fromfunc(PyObject *NPY_UNUSED(dummy), PyObject *args, PyObject *NPY_UNUSED
 
     nfuncs = PyList_Size(func_list);
     PyUFuncGenericFunction *funcs = PyArray_malloc(nfuncs * sizeof(PyUFuncGenericFunction));
+    if (funcs == NULL) {
+        return NULL;
+    }
+
     for (i = 0; i < nfuncs; i++) {
         func_obj = PyList_GetItem(func_list, i);
         funcs[i] = (PyUFuncGenericFunction)PyLong_AsLong(func_obj);
     }
 
     char *types = PyArray_malloc(nfuncs * (nin+nout) * sizeof(char));
+    if (types == NULL) {
+        return NULL;
+    }
+
     for (i = 0; i < nfuncs; i++) {
         type_obj = PyList_GetItem(type_list, i);
         
@@ -118,9 +126,18 @@ ufunc_fromfunc(PyObject *NPY_UNUSED(dummy), PyObject *args, PyObject *NPY_UNUSED
     }
 
     void **data = PyArray_malloc(nfuncs * sizeof(void *));
+    if (data == NULL) {
+        return NULL;
+    }
+
     for (i = 0; i < nfuncs; i++) {
         data_obj = PyList_GetItem(data_list, i);
-        data[i] = (void*)PyLong_AsLong(data_obj);
+        if (data_obj != Py_None) {
+            data[i] = (void*)PyLong_AsLong(data_obj);
+        }
+        else {
+            data[i] = NULL;
+        }
     }
 
     PyObject* ufunc = PyUFunc_FromFuncAndData((PyUFuncGenericFunction*)funcs,data,(char*)types,nfuncs,nin,nout,PyUFunc_None,"test",(char*)"test",0);
