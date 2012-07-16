@@ -97,7 +97,7 @@ ufunc_fromfunc(PyObject *NPY_UNUSED(dummy), PyObject *args, PyObject *NPY_UNUSED
     PyObject *data_obj;
     int i, j;
 
-    if (!PyArg_ParseTuple(args, "O!O!iiO!", &PyList_Type, &func_list, &PyList_Type, &type_list, &nin, &nout, &PyList_Type, &data_list)) {
+    if (!PyArg_ParseTuple(args, "O!O!iiO", &PyList_Type, &func_list, &PyList_Type, &type_list, &nin, &nout, &data_list)) {
         return NULL;
     }
 
@@ -107,9 +107,18 @@ ufunc_fromfunc(PyObject *NPY_UNUSED(dummy), PyObject *args, PyObject *NPY_UNUSED
         return NULL;
     }
 
+    /* build function pointer array */
     for (i = 0; i < nfuncs; i++) {
         func_obj = PyList_GetItem(func_list, i);
-        funcs[i] = (PyUFuncGenericFunction)PyLong_AsLong(func_obj);
+        /* Function pointers are passed in as long objects.
+           Is there a better way to do this? */
+        if (PyLong_Check(func_obj)) {
+            funcs[i] = (PyUFuncGenericFunction)PyLong_AsLong(func_obj);
+        }
+        else {
+            PyErr_SetString(PyExc_TypeError, "function pointer must be long object, or None");
+            return NULL;
+        }
     }
 
     char *types = PyArray_malloc(nfuncs * (nin+nout) * sizeof(char));
@@ -117,6 +126,7 @@ ufunc_fromfunc(PyObject *NPY_UNUSED(dummy), PyObject *args, PyObject *NPY_UNUSED
         return NULL;
     }
 
+    /* build function signatures array */
     for (i = 0; i < nfuncs; i++) {
         type_obj = PyList_GetItem(type_list, i);
         
@@ -130,13 +140,27 @@ ufunc_fromfunc(PyObject *NPY_UNUSED(dummy), PyObject *args, PyObject *NPY_UNUSED
         return NULL;
     }
 
+    /* build function data pointers array */
     for (i = 0; i < nfuncs; i++) {
-        data_obj = PyList_GetItem(data_list, i);
-        if (data_obj != Py_None) {
-            data[i] = (void*)PyLong_AsLong(data_obj);
+        if (PyList_Check(data_list)) {
+            data_obj = PyList_GetItem(data_list, i);
+            if (PyLong_Check(data_obj)) {
+                data[i] = (void*)PyLong_AsLong(data_obj);
+            }
+            else if (data_obj == Py_None) {
+                data[i] = NULL;
+            }
+            else {
+                PyErr_SetString(PyExc_TypeError, "data pointer must be long object, or None");
+                return NULL;
+            }
+        }
+        else if (data_list == Py_None) {
+            data[i] = NULL;
         }
         else {
-            data[i] = NULL;
+            PyErr_SetString(PyExc_TypeError, "data pointers argument must be a list of void pointers, or None");
+            return NULL;
         }
     }
 
