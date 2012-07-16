@@ -4100,6 +4100,10 @@ PyUFunc_FromFuncAndDataAndSignature(PyUFuncGenericFunction *func, void **data,
     ufunc->obj = NULL;
     ufunc->userloops=NULL;
 
+    ufunc->user_functions = NULL;
+    ufunc->user_types = NULL;
+    ufunc->user_data = NULL;
+
     /* Type resolution and inner loop selection functions */
     ufunc->type_resolver = &PyUFunc_DefaultTypeResolver;
     ufunc->legacy_inner_loop_selector = &PyUFunc_DefaultLegacyInnerLoopSelector;
@@ -4362,6 +4366,15 @@ ufunc_dealloc(PyUFuncObject *ufunc)
     }
     if (ufunc->ptr) {
         PyArray_free(ufunc->ptr);
+    }
+    if (ufunc->user_functions) {
+        PyArray_free(ufunc->user_functions);
+    }
+    if (ufunc->user_types) {
+        PyArray_free(ufunc->user_types);
+    }
+    if (ufunc->user_data) {
+        PyArray_free(ufunc->user_data);
     }
     Py_XDECREF(ufunc->userloops);
     Py_XDECREF(ufunc->obj);

@@ -163,6 +163,10 @@ typedef struct _tagPyUFuncObject {
         PyObject *obj;
         PyObject *userloops;
 
+        PyUFuncGenericFunction *user_functions;
+        char *user_types;
+        void **user_data;
+
         /* generalized ufunc parameters */
 
         /* 0 for scalar ufunc; 1 for generalized ufunc */

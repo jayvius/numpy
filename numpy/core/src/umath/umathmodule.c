@@ -88,37 +88,46 @@ ufunc_fromfunc(PyObject *NPY_UNUSED(dummy), PyObject *args, PyObject *NPY_UNUSED
 
     unsigned long func_address;
     int nin, nout;
+    int nfuncs;
+    PyObject *func_list;
     PyObject *type_list;
+    PyObject *data_list;
+    PyObject *func_obj;
     PyObject *type_obj;
-    int i;
+    PyObject *data_obj;
+    int i, j;
 
-    if (!PyArg_ParseTuple(args, "kiiO!", &func_address, &nin, &nout, &PyList_Type, &type_list)) {
+    if (!PyArg_ParseTuple(args, "O!O!iiO!", &PyList_Type, &func_list, &PyList_Type, &type_list, &nin, &nout, &PyList_Type, &data_list)) {
         return NULL;
     }
 
-    int num_types = PyList_Size(type_list);
-    if (num_types != nin+nout) {
-        /* throw exception? */
+    nfuncs = PyList_Size(func_list);
+    PyUFuncGenericFunction *funcs = PyArray_malloc(nfuncs * sizeof(PyUFuncGenericFunction));
+    for (i = 0; i < nfuncs; i++) {
+        func_obj = PyList_GetItem(func_list, i);
+        funcs[i] = (PyUFuncGenericFunction)PyLong_AsLong(func_obj);
     }
 
-    /* Add support for list of function pointers */
-    static PyUFuncGenericFunction func[1];
-    func[0] = (PyUFuncGenericFunction)func_address;
-
-    /*static char types = calloc(num_types, sizeof(char));
-    for (i = 0; i < num_types; i++) {
+    char *types = PyArray_malloc(nfuncs * (nin+nout) * sizeof(char));
+    for (i = 0; i < nfuncs; i++) {
         type_obj = PyList_GetItem(type_list, i);
-    }*/
+        
+        for (j = 0; j < (nin+nout); j++) {
+            types[i*(nin+nout) + j] = (char)PyLong_AsLong(PyList_GetItem(type_obj, j));
+        }
+    }
 
-    /* figure out how to get types from type list argument, instead of being hard coded here */
-    static char types[3];
-    types[0] = NPY_FLOAT;
-    types[1] = NPY_FLOAT;
-    types[2] = NPY_FLOAT;
+    void **data = PyArray_malloc(nfuncs * sizeof(void *));
+    for (i = 0; i < nfuncs; i++) {
+        data_obj = PyList_GetItem(data_list, i);
+        data[i] = (void*)PyLong_AsLong(data_obj);
+    }
 
-    static void* data[1] = {0};
+    PyObject* ufunc = PyUFunc_FromFuncAndData((PyUFuncGenericFunction*)funcs,data,(char*)types,nfuncs,nin,nout,PyUFunc_None,"test",(char*)"test",0);
 
-    PyObject* ufunc = PyUFunc_FromFuncAndData((PyUFuncGenericFunction*)func,data,(char*)types,1,nin,nout,PyUFunc_None,"test",(char*)"test",0);
+    ((PyUFuncObject*)ufunc)->user_functions = funcs;
+    ((PyUFuncObject*)ufunc)->user_types = types;
+    ((PyUFuncObject*)ufunc)->user_data = data;
 
     return ufunc;
 }
