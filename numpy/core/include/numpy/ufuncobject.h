@@ -165,6 +165,7 @@ typedef struct _tagPyUFuncObject {
 
         PyUFuncGenericFunction *user_functions;
         char *user_types;
+        int *user_custom_types;
         void **user_data;
 
         /* generalized ufunc parameters */

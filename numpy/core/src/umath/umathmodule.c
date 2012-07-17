@@ -88,7 +88,7 @@ ufunc_fromfunc(PyObject *NPY_UNUSED(dummy), PyObject *args, PyObject *NPY_UNUSED
 
     unsigned long func_address;
     int nin, nout;
-    int nfuncs;
+    int nfuncs, ntypes, ndata;
     PyObject *func_list;
     PyObject *type_list;
     PyObject *data_list;
@@ -96,12 +96,26 @@ ufunc_fromfunc(PyObject *NPY_UNUSED(dummy), PyObject *args, PyObject *NPY_UNUSED
     PyObject *type_obj;
     PyObject *data_obj;
     int i, j;
+    int custom_dtype = 0;
 
     if (!PyArg_ParseTuple(args, "O!O!iiO", &PyList_Type, &func_list, &PyList_Type, &type_list, &nin, &nout, &data_list)) {
         return NULL;
     }
 
     nfuncs = PyList_Size(func_list);
+
+    ntypes = PyList_Size(type_list);
+    if (ntypes != nfuncs) {
+        PyErr_SetString(PyExc_TypeError, "length of types list must be same as length of function pointer list");
+        return NULL;
+    }
+
+    ndata = PyList_Size(data_list);
+    if (ndata != nfuncs) {
+        PyErr_SetString(PyExc_TypeError, "length of data pointer list must be same as length of function pointer list");
+        return NULL;
+    }
+
     PyUFuncGenericFunction *funcs = PyArray_malloc(nfuncs * sizeof(PyUFuncGenericFunction));
     if (funcs == NULL) {
         return NULL;
@@ -121,7 +135,7 @@ ufunc_fromfunc(PyObject *NPY_UNUSED(dummy), PyObject *args, PyObject *NPY_UNUSED
         }
     }
 
-    char *types = PyArray_malloc(nfuncs * (nin+nout) * sizeof(char));
+    int *types = PyArray_malloc(nfuncs * (nin+nout) * sizeof(int));
     if (types == NULL) {
         return NULL;
     }
@@ -131,7 +145,11 @@ ufunc_fromfunc(PyObject *NPY_UNUSED(dummy), PyObject *args, PyObject *NPY_UNUSED
         type_obj = PyList_GetItem(type_list, i);
         
         for (j = 0; j < (nin+nout); j++) {
-            types[i*(nin+nout) + j] = (char)PyLong_AsLong(PyList_GetItem(type_obj, j));
+            types[i*(nin+nout) + j] = PyLong_AsLong(PyList_GetItem(type_obj, j));
+            int dtype_num = PyLong_AsLong(PyList_GetItem(type_obj, j));
+            if (dtype_num >= NPY_USERDEF) {
+                custom_dtype = dtype_num;
+            }
         }
     }
 
@@ -164,10 +182,25 @@ ufunc_fromfunc(PyObject *NPY_UNUSED(dummy), PyObject *args, PyObject *NPY_UNUSED
         }
     }
 
-    PyObject* ufunc = PyUFunc_FromFuncAndData((PyUFuncGenericFunction*)funcs,data,(char*)types,nfuncs,nin,nout,PyUFunc_None,"test",(char*)"test",0);
+    PyObject *ufunc;
+    if (!custom_dtype) {
+        char *char_types = PyArray_malloc(nfuncs * (nin+nout) * sizeof(char));
+        for (i = 0; i < nfuncs; i++) {
+            for (j = 0; j < (nin+nout); j++) {
+                char_types[i*(nin+nout) + j] = (char)types[i*(nin+nout) + j];
+            }
+        }
+        PyArray_free(types);
+        ufunc = PyUFunc_FromFuncAndData((PyUFuncGenericFunction*)funcs,data,(char*)char_types,nfuncs,nin,nout,PyUFunc_None,"test",(char*)"test",0);
+        ((PyUFuncObject*)ufunc)->user_types = char_types;
+    }
+    else {
+        ufunc = PyUFunc_FromFuncAndData(0,0,0,0,nin,nout,PyUFunc_None,"test",(char*)"test",0);
+        PyUFunc_RegisterLoopForType((PyUFuncObject*)ufunc,custom_dtype,funcs[0],types,0);
+        ((PyUFuncObject*)ufunc)->user_custom_types = types;
+    }
 
     ((PyUFuncObject*)ufunc)->user_functions = funcs;
-    ((PyUFuncObject*)ufunc)->user_types = types;
     ((PyUFuncObject*)ufunc)->user_data = data;
 
     return ufunc;

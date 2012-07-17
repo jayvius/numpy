@@ -4102,6 +4102,7 @@ PyUFunc_FromFuncAndDataAndSignature(PyUFuncGenericFunction *func, void **data,
 
     ufunc->user_functions = NULL;
     ufunc->user_types = NULL;
+    ufunc->user_custom_types = NULL;
     ufunc->user_data = NULL;
 
     /* Type resolution and inner loop selection functions */
@@ -4372,6 +4373,9 @@ ufunc_dealloc(PyUFuncObject *ufunc)
     }
     if (ufunc->user_types) {
         PyArray_free(ufunc->user_types);
+    }
+    if (ufunc->user_custom_types) {
+        PyArray_free(ufunc->user_custom_types);
     }
     if (ufunc->user_data) {
         PyArray_free(ufunc->user_data);
