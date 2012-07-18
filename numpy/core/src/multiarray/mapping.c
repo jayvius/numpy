@@ -23,6 +23,8 @@
 #define SOBJ_TOOMANY 3
 #define SOBJ_LISTTUP 4
 
+extern const int NPY_ARRAY_WARN_ON_WRITE;
+
 static PyObject *
 array_subscript_simple(PyArrayObject *self, PyObject *op);
 
