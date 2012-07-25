@@ -192,16 +192,11 @@ ufunc_fromfunc(PyObject *NPY_UNUSED(dummy), PyObject *args, PyObject *NPY_UNUSED
         }
         PyArray_free(types);
         ufunc = PyUFunc_FromFuncAndData((PyUFuncGenericFunction*)funcs,data,(char*)char_types,nfuncs,nin,nout,PyUFunc_None,"test",(char*)"test",0);
-        ((PyUFuncObject*)ufunc)->user_types = char_types;
     }
     else {
         ufunc = PyUFunc_FromFuncAndData(0,0,0,0,nin,nout,PyUFunc_None,"test",(char*)"test",0);
         PyUFunc_RegisterLoopForType((PyUFuncObject*)ufunc,custom_dtype,funcs[0],types,0);
-        ((PyUFuncObject*)ufunc)->user_custom_types = types;
     }
-
-    ((PyUFuncObject*)ufunc)->user_functions = funcs;
-    ((PyUFuncObject*)ufunc)->user_data = data;
 
     return ufunc;
 }
