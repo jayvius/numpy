@@ -4244,7 +4244,7 @@ PyUFunc_RegisterLoopForStructType(PyUFuncObject *ufunc,
         return -1;
     }
 
-    key = PyInt_FromLong((long) PyArray_DESCR(user_dtype)->type_num);
+    key = PyInt_FromLong((long) user_dtype->type_num);
     if (key == NULL) {
         return -1;
     }
@@ -4252,16 +4252,16 @@ PyUFunc_RegisterLoopForStructType(PyUFuncObject *ufunc,
     arg_typenums = calloc(ufunc->nargs, sizeof(int));
     if (arg_dtypes != NULL) {
         for (i = 0; i < ufunc->nargs; i++) {
-            arg_typenums[i] = PyArray_DESCR(arg_dtypes[i])->type_num;
+            arg_typenums[i] = arg_dtypes[i]->type_num;
         }
     }
     else {
         for (i = 0; i < ufunc->nargs; i++) {
-            arg_typenums[i] = PyArray_DESCR(user_dtype)->type_num;
+            arg_typenums[i] = user_dtype->type_num;
         }
     }
-
-    result = PyUFunc_RegisterLoopForType(ufunc, PyArray_DESCR(user_dtype)->type_num, function, arg_typenums, data);
+    
+    result = PyUFunc_RegisterLoopForType(ufunc, user_dtype->type_num, function, arg_typenums, data);
 
     if (result == 0) {
         cobj = PyDict_GetItem(ufunc->userloops, key);
@@ -4321,7 +4321,7 @@ PyUFunc_RegisterLoopForType(PyUFuncObject *ufunc,
     int *newtypes=NULL;
 
     descr=PyArray_DescrFromType(usertype);
-    if ((usertype < NPY_USERDEF) || (descr==NULL)) {
+    if ((usertype < NPY_USERDEF && usertype != NPY_VOID) || (descr==NULL)) {
         PyErr_SetString(PyExc_TypeError, "unknown user-defined type");
         return -1;
     }

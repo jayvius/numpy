@@ -1175,7 +1175,7 @@ find_userloop(PyUFuncObject *ufunc,
 
     for (i = 0; i < nin; ++i) {
         int type_num = dtypes[i]->type_num;
-        if (type_num != last_userdef && PyTypeNum_ISUSERDEF(type_num)) {
+        if (type_num != last_userdef && (PyTypeNum_ISUSERDEF(type_num) || type_num == NPY_VOID)) {
             PyObject *key, *obj;
 
             last_userdef = type_num;
@@ -1422,7 +1422,7 @@ ufunc_loop_matches(PyUFuncObject *self,
                     NPY_CASTING output_casting,
                     int any_object,
                     int use_min_scalar,
-                    int *types,
+                    int *types, PyArray_Descr **dtypes,
                     int *out_no_castable_output,
                     char *out_err_src_typecode,
                     char *out_err_dst_typecode)
@@ -1449,7 +1449,12 @@ ufunc_loop_matches(PyUFuncObject *self,
             return 0;
         }
 
-        tmp = PyArray_DescrFromType(types[i]);
+        if (types[i] == NPY_VOID && dtypes[i] != NULL) {
+            tmp = dtypes[i];
+        }
+        else {
+            tmp = PyArray_DescrFromType(types[i]);
+        }
         if (tmp == NULL) {
             return -1;
         }
@@ -1582,7 +1587,7 @@ linear_search_userloop_type_resolver(PyUFuncObject *self,
 
     for (i = 0; i < nin; ++i) {
         int type_num = PyArray_DESCR(op[i])->type_num;
-        if (type_num != last_userdef && PyTypeNum_ISUSERDEF(type_num)) {
+        if (type_num != last_userdef && (PyTypeNum_ISUSERDEF(type_num) || type_num == NPY_VOID)) {
             PyObject *key, *obj;
 
             last_userdef = type_num;
@@ -1602,7 +1607,7 @@ linear_search_userloop_type_resolver(PyUFuncObject *self,
                 switch (ufunc_loop_matches(self, op,
                             input_casting, output_casting,
                             any_object, use_min_scalar,
-                            types,
+                            types, funcdata->arg_dtypes,
                             out_no_castable_output, out_err_src_typecode,
                             out_err_dst_typecode)) {
                     /* Error */
@@ -1686,7 +1691,7 @@ type_tuple_userloop_type_resolver(PyUFuncObject *self,
                 switch (ufunc_loop_matches(self, op,
                             casting, casting,
                             any_object, use_min_scalar,
-                            types,
+                            types, NULL,
                             &no_castable_output, &err_src_typecode,
                             &err_dst_typecode)) {
                     /* It works */
@@ -1854,7 +1859,7 @@ linear_search_type_resolver(PyUFuncObject *self,
         switch (ufunc_loop_matches(self, op,
                     input_casting, output_casting,
                     any_object, use_min_scalar,
-                    types,
+                    types, NULL,
                     &no_castable_output, &err_src_typecode,
                     &err_dst_typecode)) {
             /* Error */
@@ -2060,7 +2065,7 @@ type_tuple_type_resolver(PyUFuncObject *self,
         switch (ufunc_loop_matches(self, op,
                     casting, casting,
                     any_object, use_min_scalar,
-                    types,
+                    types, NULL,
                     &no_castable_output, &err_src_typecode,
                     &err_dst_typecode)) {
             /* Error */
