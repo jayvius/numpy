@@ -1177,12 +1177,22 @@ iterator_loop(PyUFuncObject *ufunc,
 
     PyArrayObject **op_it;
 
+    npy_uint32 iter_flags;
+
     NPY_BEGIN_THREADS_DEF;
 
     /* Set up the flags */
     for (i = 0; i < nin; ++i) {
         op_flags[i] = NPY_ITER_READONLY|
                       NPY_ITER_ALIGNED;
+        /* 
+         * If READWRITE flag has been set for this operand,
+         * then clear default READONLY flag
+         */ 
+        op_flags[i] |= ufunc->op_flags[i];
+        if (op_flags[i] & (NPY_ITER_READWRITE | NPY_ITER_WRITEONLY)) {
+            op_flags[i] &= ~NPY_ITER_READONLY;
+        }
     }
     for (i = nin; i < nop; ++i) {
         op_flags[i] = NPY_ITER_WRITEONLY|
@@ -1190,7 +1200,21 @@ iterator_loop(PyUFuncObject *ufunc,
                       NPY_ITER_ALLOCATE|
                       NPY_ITER_NO_BROADCAST|
                       NPY_ITER_NO_SUBTYPE;
+
+        if (ufunc->op_flags[i] > 0) {
+            PyErr_SetString(PyExc_ValueError, "manually setting ufunc operand " \
+                "flags for output operand is not supported at this time");
+            return -1;
+        }
     }
+
+    iter_flags = ufunc->iter_flags|
+                 NPY_ITER_EXTERNAL_LOOP|
+                 NPY_ITER_REFS_OK|
+                 NPY_ITER_ZEROSIZE_OK|
+                 NPY_ITER_BUFFERED|
+                 NPY_ITER_GROWINNER|
+                 NPY_ITER_DELAY_BUFALLOC;
 
     /*
      * Allocate the iterator.  Because the types of the inputs
@@ -1198,12 +1222,7 @@ iterator_loop(PyUFuncObject *ufunc,
      * is faster to calculate.
      */
     iter = NpyIter_AdvancedNew(nop, op,
-                        NPY_ITER_EXTERNAL_LOOP|
-                        NPY_ITER_REFS_OK|
-                        NPY_ITER_ZEROSIZE_OK|
-                        NPY_ITER_BUFFERED|
-                        NPY_ITER_GROWINNER|
-                        NPY_ITER_DELAY_BUFALLOC,
+                        iter_flags,
                         order, NPY_UNSAFE_CASTING,
                         op_flags, dtype,
                         0, NULL, NULL, buffersize);
@@ -1458,8 +1477,10 @@ execute_fancy_ufunc_loop(PyUFuncObject *ufunc,
 
     PyArrayObject **op_it;
 
-    NPY_BEGIN_THREADS_DEF;
+    npy_uint32 iter_flags;
 
+    NPY_BEGIN_THREADS_DEF;
+    
     if (wheremask != NULL) {
         if (nop + 1 > NPY_MAXARGS) {
             PyErr_SetString(PyExc_ValueError,
@@ -1476,6 +1497,14 @@ execute_fancy_ufunc_loop(PyUFuncObject *ufunc,
         op_flags[i] = default_op_in_flags |
                       NPY_ITER_READONLY |
                       NPY_ITER_ALIGNED;
+        /* 
+         * If READWRITE flag has been set for this operand,
+         * then clear default READONLY flag
+         */       
+        op_flags[i] |= ufunc->op_flags[i];
+        if (op_flags[i] & (NPY_ITER_READWRITE | NPY_ITER_WRITEONLY)) {
+            op_flags[i] &= ~NPY_ITER_READONLY;
+        }
     }
     for (i = nin; i < nop; ++i) {
         op_flags[i] = default_op_out_flags |
@@ -1484,6 +1513,12 @@ execute_fancy_ufunc_loop(PyUFuncObject *ufunc,
                       NPY_ITER_ALLOCATE |
                       NPY_ITER_NO_BROADCAST |
                       NPY_ITER_NO_SUBTYPE;
+        
+        if (ufunc->op_flags[i] > 0) {
+            PyErr_SetString(PyExc_ValueError, "manually setting ufunc operand " \
+                "flags for output operand is not supported at this time");
+            return -1;
+        }
     }
     if (wheremask != NULL) {
         op_flags[nop] = NPY_ITER_READONLY | NPY_ITER_ARRAYMASK;
@@ -1491,17 +1526,20 @@ execute_fancy_ufunc_loop(PyUFuncObject *ufunc,
 
     NPY_UF_DBG_PRINT("Making iterator\n");
 
+    iter_flags = ufunc->iter_flags|
+                 NPY_ITER_EXTERNAL_LOOP|
+                 NPY_ITER_REFS_OK|
+                 NPY_ITER_ZEROSIZE_OK|
+                 NPY_ITER_BUFFERED|
+                 NPY_ITER_GROWINNER;
+
     /*
      * Allocate the iterator.  Because the types of the inputs
      * were already checked, we use the casting rule 'unsafe' which
      * is faster to calculate.
      */
     iter = NpyIter_AdvancedNew(nop + ((wheremask != NULL) ? 1 : 0), op,
-                        NPY_ITER_EXTERNAL_LOOP |
-                        NPY_ITER_REFS_OK |
-                        NPY_ITER_ZEROSIZE_OK |
-                        NPY_ITER_BUFFERED |
-                        NPY_ITER_GROWINNER,
+                        iter_flags,
                         order, NPY_UNSAFE_CASTING,
                         op_flags, dtypes,
                         0, NULL, NULL, buffersize);
@@ -1659,6 +1697,8 @@ PyUFunc_GeneralizedFunction(PyUFuncObject *ufunc,
     npy_uint32 op_flags[NPY_MAXARGS];
 
     NpyIter *iter = NULL;
+    
+    npy_uint32 iter_flags;
 
     /* These parameters come from extobj= or from a TLS global */
     int buffersize = 0, errormask = 0;
@@ -1873,6 +1913,14 @@ PyUFunc_GeneralizedFunction(PyUFuncObject *ufunc,
         op_flags[i] = NPY_ITER_READONLY|
                       NPY_ITER_COPY|
                       NPY_ITER_ALIGNED;
+        /* 
+         * If READWRITE flag has been set for this operand,
+         * then clear default READONLY flag
+         */ 
+        op_flags[i] |= ufunc->op_flags[i];
+        if (op_flags[i] & (NPY_ITER_READWRITE | NPY_ITER_WRITEONLY)) {
+            op_flags[i] &= ~NPY_ITER_READONLY;
+        }
     }
     for (i = nin; i < nop; ++i) {
         op_flags[i] = NPY_ITER_READWRITE|
@@ -1880,12 +1928,21 @@ PyUFunc_GeneralizedFunction(PyUFuncObject *ufunc,
                       NPY_ITER_ALIGNED|
                       NPY_ITER_ALLOCATE|
                       NPY_ITER_NO_BROADCAST;
+
+        if (ufunc->op_flags[i] > 0) {
+            PyErr_SetString(PyExc_ValueError, "manually setting ufunc operand " \
+                "flags for output operand is not supported at this time");
+            return -1;
+        }
     }
 
+    iter_flags = ufunc->iter_flags|
+                 NPY_ITER_MULTI_INDEX|
+                 NPY_ITER_REFS_OK|
+                 NPY_ITER_REDUCE_OK;
+
     /* Create the iterator */
-    iter = NpyIter_AdvancedNew(nop, op, NPY_ITER_MULTI_INDEX|
-                                      NPY_ITER_REFS_OK|
-                                      NPY_ITER_REDUCE_OK,
+    iter = NpyIter_AdvancedNew(nop, op, iter_flags,
                            order, NPY_UNSAFE_CASTING, op_flags,
                            dtypes, op_ndim, op_axes, NULL, 0);
     if (iter == NULL) {
@@ -4115,6 +4172,11 @@ PyUFunc_FromFuncAndDataAndSignature(PyUFuncGenericFunction *func, void **data,
     }
     ufunc->doc = doc;
 
+    ufunc->op_flags = PyArray_malloc(sizeof(npy_uint32)*ufunc->nargs);
+    memset(ufunc->op_flags, 0, sizeof(npy_uint32)*ufunc->nargs);
+
+    ufunc->iter_flags = 0;
+
     /* generalized ufunc */
     ufunc->core_enabled = 0;
     ufunc->core_num_dim_ix = 0;
@@ -4444,6 +4506,9 @@ ufunc_dealloc(PyUFuncObject *ufunc)
     }
     if (ufunc->ptr) {
         PyArray_free(ufunc->ptr);
+    }
+    if (ufunc->op_flags) {
+        PyArray_free(ufunc->op_flags);
     }
     Py_XDECREF(ufunc->userloops);
     Py_XDECREF(ufunc->obj);
