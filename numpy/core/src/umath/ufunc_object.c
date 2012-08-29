@@ -774,11 +774,10 @@ static int get_ufunc_arguments(PyUFuncObject *ufunc,
      *
      * Not sure - adding this increased to 246 errors, 150 failures.
      */
-    // JNB: ?
-    //if (any_flexible && !any_object) {
-    //    return -2;
+    if (any_flexible && !any_object) {
+        return -2;
 
-    //}
+    }
 
     /* Get positional output arguments */
     for (i = nin; i < nargs; ++i) {

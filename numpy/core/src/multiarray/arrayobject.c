@@ -1291,7 +1291,21 @@ array_richcompare(PyArrayObject *self, PyObject *other, int cmp_op)
         result = PyArray_GenericBinaryFunction(self,
                 (PyObject *)array_other,
                 n_ops.equal);
-        if ((result == Py_NotImplemented) &&
+
+        int any_flexible = 0;
+        if (PyTypeNum_ISFLEXIBLE(PyArray_DESCR(self)->type_num) &&
+            PyTypeNum_ISFLEXIBLE(PyArray_DESCR(array_other)->type_num)) {
+            any_flexible = 1;
+        }
+        
+        int any_object = 0;
+        if (PyTypeNum_ISOBJECT(PyArray_DESCR(self)->type_num) &&
+            PyTypeNum_ISOBJECT(PyArray_DESCR(array_other)->type_num)) {
+            any_object = 1;
+        }
+
+        //printf("JNB: array_richcompare() %d %d %d\n", any_flexible, any_object, (result == Py_NotImplemented));
+        if (((result == Py_NotImplemented) || (any_flexible && !any_object)) &&
                 (PyArray_TYPE(self) == NPY_VOID)) {
             int _res;
 
@@ -1304,8 +1318,10 @@ array_richcompare(PyArrayObject *self, PyObject *other, int cmp_op)
                 Py_DECREF(array_other);
                 return NULL;
             }
-            if (_res) {
+            if (_res > 0) {
                 Py_DECREF(result);
+            }
+            if (_res >= 0) {
                 result = _void_compare(self, array_other, cmp_op);
             }
             Py_DECREF(array_other);
