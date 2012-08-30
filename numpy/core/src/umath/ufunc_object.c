@@ -774,7 +774,7 @@ static int get_ufunc_arguments(PyUFuncObject *ufunc,
      *
      * Not sure - adding this increased to 246 errors, 150 failures.
      */
-    if (any_flexible && !any_object) {
+    if (any_flexible && !any_object && !ufunc->struct_ufunc) {
         return -2;
 
     }
@@ -4176,6 +4176,8 @@ PyUFunc_FromFuncAndDataAndSignature(PyUFuncGenericFunction *func, void **data,
 
     ufunc->iter_flags = 0;
 
+    ufunc->struct_ufunc = 0;
+
     /* generalized ufunc */
     ufunc->core_enabled = 0;
     ufunc->core_num_dim_ix = 0;
@@ -4359,6 +4361,8 @@ PyUFunc_RegisterLoopForStructType(PyUFuncObject *ufunc,
             }
         }
     }
+
+    ufunc->struct_ufunc = 1;
 
     free(arg_typenums);
 

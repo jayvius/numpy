@@ -226,6 +226,9 @@ typedef struct _tagPyUFuncObject {
          * set by nditer object.
          */
         npy_uint32 iter_flags;
+
+        int struct_ufunc;
+
 } PyUFuncObject;
 
 #include "arrayobject.h"
