@@ -1919,6 +1919,8 @@ PyUFunc_GeneralizedFunction(PyUFuncObject *ufunc,
         op_flags[i] |= ufunc->op_flags[i];
         if (op_flags[i] & (NPY_ITER_READWRITE | NPY_ITER_WRITEONLY)) {
             op_flags[i] &= ~NPY_ITER_READONLY;
+            op_flags[i] &= ~NPY_ITER_COPY;
+            op_flags[i] |= NPY_ITER_UPDATEIFCOPY;
         }
     }
     for (i = nin; i < nop; ++i) {
