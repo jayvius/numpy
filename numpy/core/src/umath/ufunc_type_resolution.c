@@ -1516,7 +1516,7 @@ ufunc_loop_matches(PyUFuncObject *self,
 static int
 set_ufunc_loop_data_types(PyUFuncObject *self, PyArrayObject **op,
                     PyArray_Descr **out_dtypes,
-                    int *type_nums)
+                    int *type_nums, PyArray_Descr **dtypes)
 {
     int i, nin = self->nin, nop = nin + self->nout;
 
@@ -1527,11 +1527,14 @@ set_ufunc_loop_data_types(PyUFuncObject *self, PyArrayObject **op,
      * instead of creating a new one, similarly to preserve metadata.
      **/
     for (i = 0; i < nop; ++i) {
+        if (dtypes != NULL) {
+            out_dtypes[i] = dtypes[i];
+            Py_XINCREF(out_dtypes[i]);
         /*
          * Copy the dtype from 'op' if the type_num matches,
          * to preserve metadata.
          */
-        if (op[i] != NULL && PyArray_DESCR(op[i])->type_num == type_nums[i]) {
+        } else if (op[i] != NULL && PyArray_DESCR(op[i])->type_num == type_nums[i]) {
             out_dtypes[i] = ensure_dtype_nbo(PyArray_DESCR(op[i]));
             Py_XINCREF(out_dtypes[i]);
         }
@@ -1615,7 +1618,7 @@ linear_search_userloop_type_resolver(PyUFuncObject *self,
                         return -1;
                     /* Found a match */
                     case 1:
-                        set_ufunc_loop_data_types(self, op, out_dtype, types);
+                        set_ufunc_loop_data_types(self, op, out_dtype, types, funcdata->arg_dtypes);
                         return 1;
                 }
 
@@ -1696,7 +1699,7 @@ type_tuple_userloop_type_resolver(PyUFuncObject *self,
                             &err_dst_typecode)) {
                     /* It works */
                     case 1:
-                        set_ufunc_loop_data_types(self, op, out_dtype, types);
+                        set_ufunc_loop_data_types(self, op, out_dtype, types, NULL);
                         return 1;
                     /* Didn't match */
                     case 0:
@@ -1867,7 +1870,7 @@ linear_search_type_resolver(PyUFuncObject *self,
                 return -1;
             /* Found a match */
             case 1:
-                set_ufunc_loop_data_types(self, op, out_dtype, types);
+                set_ufunc_loop_data_types(self, op, out_dtype, types, NULL);
                 return 0;
         }
     }
@@ -2073,7 +2076,7 @@ type_tuple_type_resolver(PyUFuncObject *self,
                 return -1;
             /* It worked */
             case 1:
-                set_ufunc_loop_data_types(self, op, out_dtype, types);
+                set_ufunc_loop_data_types(self, op, out_dtype, types, NULL);
                 return 0;
             /* Didn't work */
             case 0:
