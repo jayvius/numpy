@@ -1449,8 +1449,9 @@ ufunc_loop_matches(PyUFuncObject *self,
             return 0;
         }
 
-        if (types[i] == NPY_VOID && dtypes[i] != NULL) {
+        if (types[i] == NPY_VOID && dtypes != NULL) {
             tmp = dtypes[i];
+            Py_INCREF(tmp);
         }
         else {
             tmp = PyArray_DescrFromType(types[i]);
