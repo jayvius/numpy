@@ -719,7 +719,7 @@ static int get_ufunc_arguments(PyUFuncObject *ufunc,
     PyObject *str_key_obj = NULL;
     char *ufunc_name;
 
-    int any_flexible = 0, any_object = 0;
+    int any_flexible = 0, any_object = 0, any_flexible_userloops = 0;
 
     ufunc_name = ufunc->name ? ufunc->name : "<unnamed ufunc>";
 
@@ -758,13 +758,38 @@ static int get_ufunc_arguments(PyUFuncObject *ufunc,
         if (out_op[i] == NULL) {
             return -1;
         }
+
+        int type_num = PyArray_DESCR(out_op[i])->type_num;
         if (!any_flexible &&
-                PyTypeNum_ISFLEXIBLE(PyArray_DESCR(out_op[i])->type_num)) {
+                PyTypeNum_ISFLEXIBLE(type_num)) {
             any_flexible = 1;
         }
         if (!any_object &&
-                PyTypeNum_ISOBJECT(PyArray_DESCR(out_op[i])->type_num)) {
+                PyTypeNum_ISOBJECT(type_num)) {
             any_object = 1;
+        }
+
+        if (any_flexible && !any_flexible_userloops && ufunc->userloops != NULL) {
+            PyUFunc_Loop1d *funcdata;
+            PyObject *key, *obj;
+            key = PyInt_FromLong(type_num);
+            if (key == NULL) {
+                continue;
+            }
+            obj = PyDict_GetItem(ufunc->userloops, key);
+            Py_DECREF(key);
+            if (obj == NULL) {
+                continue;
+            }
+            funcdata = (PyUFunc_Loop1d *)NpyCapsule_AsVoidPtr(obj);
+            while (funcdata != NULL) {
+                if (funcdata->arg_dtypes != NULL) {
+                    any_flexible_userloops = 1;
+                    break;
+                }
+
+                funcdata = funcdata->next;
+            }
         }
     }
 
@@ -774,7 +799,7 @@ static int get_ufunc_arguments(PyUFuncObject *ufunc,
      *
      * Not sure - adding this increased to 246 errors, 150 failures.
      */
-    if (any_flexible && !any_object && !ufunc->struct_ufunc) {
+    if (any_flexible && !any_flexible_userloops && !any_object) {
         return -2;
 
     }
@@ -4178,8 +4203,6 @@ PyUFunc_FromFuncAndDataAndSignature(PyUFuncGenericFunction *func, void **data,
 
     ufunc->iter_flags = 0;
 
-    ufunc->struct_ufunc = 0;
-
     /* generalized ufunc */
     ufunc->core_enabled = 0;
     ufunc->core_num_dim_ix = 0;
@@ -4363,8 +4386,6 @@ PyUFunc_RegisterLoopForStructType(PyUFuncObject *ufunc,
             }
         }
     }
-
-    ufunc->struct_ufunc = 1;
 
     free(arg_typenums);
 

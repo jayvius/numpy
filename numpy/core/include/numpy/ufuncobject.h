@@ -227,8 +227,6 @@ typedef struct _tagPyUFuncObject {
          */
         npy_uint32 iter_flags;
 
-        int struct_ufunc;
-
 } PyUFuncObject;
 
 #include "arrayobject.h"
