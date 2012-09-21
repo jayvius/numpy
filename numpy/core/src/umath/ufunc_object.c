@@ -4225,9 +4225,19 @@ cmp_arg_types(int *arg1, int *arg2, int n)
 static NPY_INLINE void
 _free_loop1d_list(PyUFunc_Loop1d *data)
 {
+    int i;
+
     while (data != NULL) {
         PyUFunc_Loop1d *next = data->next;
         PyArray_free(data->arg_types);
+
+        if (data->arg_dtypes != NULL) {
+            for (i = 0; i < data->nargs; i++) {
+                Py_DECREF(data->arg_dtypes[i]);
+            }
+            PyArray_free(data->arg_dtypes);
+        }
+
         PyArray_free(data);
         data = next;
     }
@@ -4273,7 +4283,7 @@ PyUFunc_RegisterLoopForStructType(PyUFuncObject *ufunc,
         return -1;
     }
 
-    arg_typenums = calloc(ufunc->nargs, sizeof(int));
+    arg_typenums = PyArray_malloc(ufunc->nargs * sizeof(int));
     if (arg_dtypes != NULL) {
         for (i = 0; i < ufunc->nargs; i++) {
             arg_typenums[i] = arg_dtypes[i]->type_num;
@@ -4290,6 +4300,7 @@ PyUFunc_RegisterLoopForStructType(PyUFuncObject *ufunc,
     if (result == 0) {
         cobj = PyDict_GetItem(ufunc->userloops, key);
         if (cobj == NULL) {
+            PyErr_SetString(PyExc_KeyError, "userloop for user dtype not found");
             result = -1;
         }
         else {
@@ -4305,17 +4316,20 @@ PyUFunc_RegisterLoopForStructType(PyUFuncObject *ufunc,
                 current = current->next;
             }
             if (cmp == 0 && current->arg_dtypes == NULL) {
-                current->arg_dtypes = calloc(ufunc->nargs, sizeof(PyArray_Descr*));
+                current->arg_dtypes = PyArray_malloc(ufunc->nargs * sizeof(PyArray_Descr*));
                 if (arg_dtypes != NULL) {
                     for (i = 0; i < ufunc->nargs; i++) {
                         current->arg_dtypes[i] = arg_dtypes[i];
+                        Py_INCREF(current->arg_dtypes[i]);
                     }
                 }
                 else {
                     for (i = 0; i < ufunc->nargs; i++) {
                         current->arg_dtypes[i] = user_dtype;
+                        Py_INCREF(current->arg_dtypes[i]);
                     }
                 }
+                current->nargs = ufunc->nargs;
             }
             else {
                 result = -1;
@@ -4382,6 +4396,7 @@ PyUFunc_RegisterLoopForType(PyUFuncObject *ufunc,
     funcdata->data = data;
     funcdata->next = NULL;
     funcdata->arg_dtypes = NULL;
+    funcdata->nargs = 0;
 
     /* Get entry for this user-defined type*/
     cobj = PyDict_GetItem(ufunc->userloops, key);
