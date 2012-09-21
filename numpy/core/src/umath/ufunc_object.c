@@ -769,7 +769,14 @@ static int get_ufunc_arguments(PyUFuncObject *ufunc,
             any_object = 1;
         }
 
-        if (any_flexible && !any_flexible_userloops && ufunc->userloops != NULL) {
+        /*
+         * If any operand is a flexible dtype, check to see if any
+         * struct dtype ufuncs are registered. A ufunc has been registered
+         * for a struct dtype if ufunc's arg_dtypes array is not NULL.
+         */
+        if (PyTypeNum_ISFLEXIBLE(type_num) &&
+            !any_flexible_userloops &&
+            ufunc->userloops != NULL) {
             PyUFunc_Loop1d *funcdata;
             PyObject *key, *obj;
             key = PyInt_FromLong(type_num);
@@ -795,7 +802,8 @@ static int get_ufunc_arguments(PyUFuncObject *ufunc,
 
     /*
      * Indicate not implemented if there are flexible objects (structured
-     * type or string) but no object types.
+     * type or string) but no object types and no registered struct
+     * dtype ufuncs.
      *
      * Not sure - adding this increased to 246 errors, 150 failures.
      */

@@ -1449,6 +1449,11 @@ ufunc_loop_matches(PyUFuncObject *self,
             return 0;
         }
 
+        /*
+         * If type num is NPY_VOID and struct dtypes have been passed in,
+         * use struct dtype object. Otherwise create new dtype object
+         * from type num.
+         */
         if (types[i] == NPY_VOID && dtypes != NULL) {
             tmp = dtypes[i];
             Py_INCREF(tmp);
